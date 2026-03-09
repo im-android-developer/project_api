@@ -4,6 +4,12 @@ from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
+# Dummy credentials for testing login flow.
+DUMMY_USERS = {
+    "demo": "demo123",
+    "testuser": "test@123"
+}
+
 @app.route("/")
 def home():
     return jsonify({
@@ -19,26 +25,23 @@ def users():
 @app.post("/api/login")
 def authenticate():
     data = request.get_json(silent=True) or request.form or {}
-    login_id = data.get("login_id")
-    login_pwd = data.get("login_pwd")
 
-    if not login_id or not login_pwd:
+    # Accept both new and legacy payload keys.
+    username = (data.get("username") or data.get("login_id") or "").strip()
+    password = (data.get("password") or data.get("login_pwd") or "").strip()
+
+    if not username or not password:
         return jsonify({
             "status": "Error",
-            "message": "login_id and login_pwd are required"
+            "message": "username and password are required"
         }), 400
 
-    # Hardcoded credentials — replace with DB lookup later
-    VALID_USERS = {
-        "demo": "demo123"
-    }
-
-    if VALID_USERS.get(login_id) == login_pwd:
+    if DUMMY_USERS.get(username) == password:
         return jsonify({"status": "OK"}), 200
 
     return jsonify({
         "status": "Error",
-        "message": "Invalid login_id or login_pwd"
+        "message": "Invalid username or password"
     }), 401
 
 @app.post("/api/signup")
