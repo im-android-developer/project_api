@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 load_dotenv()  # loads DATABASE_URL from .env in local dev
 
 from flask import Flask, jsonify, request
-from db import execute_query
-from mysql.connector import Error
+from db import get_connection, execute_query
+from mysql.connector import Error, errorcode
 
 app = Flask(__name__)
 
@@ -26,7 +26,39 @@ def users():
         "users": ["Tarun", "Amit", "Rahul"]
     })
 
-@app.post("/api/login")
+@app.route("/api/db-check")
+def db_check():
+    """Check database connectivity and return a specific diagnosis on failure."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return jsonify({"status": "OK", "message": "Database connected successfully"}), 200
+
+    except Error as e:
+        code = e.errno
+
+        if not os.environ.get("DATABASE_URL") and not os.environ.get("MYSQLHOST"):
+            problem = "DATABASE_URL environment variable is not set"
+        elif code == errorcode.ER_ACCESS_DENIED_ERROR:
+            problem = "Access denied — wrong username or password"
+        elif code == errorcode.ER_BAD_DB_ERROR:
+            problem = "Database does not exist"
+        elif code == 2003:
+            problem = "Cannot connect to host — wrong host or port, or server is down"
+        elif code == 2005:
+            problem = "Unknown host — check DB_HOST / DATABASE_URL"
+        elif code == 2013:
+            problem = "Connection lost during query — server may have timed out"
+        else:
+            problem = f"MySQL error {code}: {e.msg}"
+
+        return jsonify({"status": "Error", "problem": problem}), 500
+
+
 def authenticate():
     data = request.get_json(silent=True) or request.form or {}
 
