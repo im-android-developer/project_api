@@ -1,8 +1,4 @@
--- Create and select database
-CREATE DATABASE IF NOT EXISTS StockMarketDB;
-USE StockMarketDB;
-
--- Create userbase table
+-- Create userbase table (run against Railway's `railway` database)
 CREATE TABLE IF NOT EXISTS userbase (
 
     -- 1. Primary Identification

@@ -1,5 +1,8 @@
 import os
 import hashlib
+from dotenv import load_dotenv
+
+load_dotenv()  # loads DATABASE_URL from .env in local dev
 
 from flask import Flask, jsonify, request
 from db import execute_query
