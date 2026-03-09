@@ -1,14 +1,15 @@
 import os
+import hashlib
 
 from flask import Flask, jsonify, request
+from db import execute_query
+from mysql.connector import Error
 
 app = Flask(__name__)
 
-# Dummy credentials for testing login flow.
-DUMMY_USERS = {
-    "demo": "demo123",
-    "testuser": "test@123"
-}
+def hash_password(password):
+    """SHA-256 hash — replace with bcrypt in production."""
+    return hashlib.sha256(password.encode()).hexdigest()
 
 @app.route("/")
 def home():
@@ -26,7 +27,6 @@ def users():
 def authenticate():
     data = request.get_json(silent=True) or request.form or {}
 
-    # Accept both new and legacy payload keys.
     username = (data.get("username") or data.get("login_id") or "").strip()
     password = (data.get("password") or data.get("login_pwd") or "").strip()
 
@@ -36,13 +36,18 @@ def authenticate():
             "message": "username and password are required"
         }), 400
 
-    if DUMMY_USERS.get(username) == password:
-        return jsonify({"status": "OK"}), 200
-
-    return jsonify({
-        "status": "Error",
-        "message": "Invalid username or password"
-    }), 401
+    try:
+        hashed = hash_password(password)
+        rows = execute_query(
+            "SELECT id FROM userbase WHERE (email = %s OR phone = %s) AND password = %s AND account_status = 'active'",
+            (username, username, hashed),
+            fetch=True
+        )
+        if rows:
+            return jsonify({"status": "OK"}), 200
+        return jsonify({"status": "Error", "message": "Invalid username or password"}), 401
+    except Error:
+        return jsonify({"status": "Error", "message": "Database connection failed"}), 500
 
 @app.post("/api/signup")
 def signup():
@@ -76,8 +81,19 @@ def signup():
             "message": "Password must be at least 6 characters"
         }), 400
 
-    # TODO: Store user in database
-    return jsonify({"status": "OK"}), 201
+    # Store user in database
+    try:
+        hashed = hash_password(password)
+        execute_query(
+            "INSERT INTO userbase (full_name, email, password) VALUES (%s, %s, %s)",
+            (full_name, email, hashed)
+        )
+        return jsonify({"status": "OK"}), 201
+    except Error as e:
+        err = str(e)
+        if "Duplicate entry" in err and "email" in err:
+            return jsonify({"status": "Error", "message": "Email already registered"}), 409
+        return jsonify({"status": "Error", "message": "Database connection failed"}), 500
 
 
 if __name__ == "__main__":
