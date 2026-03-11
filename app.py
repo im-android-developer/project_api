@@ -58,7 +58,7 @@ def validate_email():
 
     try:
         rows = execute_query(
-            "SELECT id FROM userbase WHERE email = %s AND account_status = 'active'",
+            "SELECT id FROM users WHERE email = %s",
             (email,),
             fetch=True
         )
