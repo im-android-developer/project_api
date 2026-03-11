@@ -79,11 +79,12 @@ def signup():
     first_name   = (data.get("first_name")   or "").strip()
     last_name    = (data.get("last_name")    or "").strip()
     email        = (data.get("email")        or "").strip()
+    username        = (data.get("username")        or "").strip()
     phone_number = (data.get("phone_number") or "").strip()
     password     = (data.get("password")     or "").strip()
 
     missing = [f for f, v in [("first_name", first_name), ("last_name", last_name),
-                               ("email", email), ("phone_number", phone_number),
+                               ("email", email), ("username", username), ("phone_number", phone_number),
                                ("password", password)] if not v]
     if missing:
         return jsonify({"status": "Error", "message": f"Missing required fields: {', '.join(missing)}"}), 400
@@ -100,8 +101,8 @@ def signup():
     try:
         hashed = hash_password(password)
         execute_query(
-            "INSERT INTO users (first_name, last_name, email, phone_number, password) VALUES (%s, %s, %s, %s, %s)",
-            (first_name, last_name, email, phone_number, hashed)
+            "INSERT INTO users (first_name, last_name, email, username, phone_number, password) VALUES (%s, %s, %s, %s, %s, %s)",
+            (first_name, last_name, email, username, phone_number, hashed)
         )
         return jsonify({"status": "OK", "message": "User registered successfully"}), 201
     except DatabaseError as e:
@@ -110,6 +111,8 @@ def signup():
             return jsonify({"status": "Error", "message": "Email already registered"}), 409
         if "unique" in err and "phone" in err:
             return jsonify({"status": "Error", "message": "Phone number already registered"}), 409
+        if "unique" in err and "username" in err:
+            return jsonify({"status": "Error", "message": "Username already taken"}), 409
         return jsonify({"status": "Error", "message": "Database error"}), 500
     except OperationalError:
         return jsonify({"status": "Error", "message": "Database connection failed"}), 500
