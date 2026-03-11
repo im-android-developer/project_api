@@ -45,66 +45,54 @@ def check_connection():
             problem = f"Connection error: {e}"
         return jsonify({"status": "Error", "problem": problem}), 500
 
-@app.post("/api/login/validate-email")
-def validate_email():
-    data  = request.get_json(silent=True) or request.form or {}
-    email = (data.get("email") or "").strip()
-
-    if not email:
-        return jsonify({"status": "Error", "message": "email is required"}), 400
-
-    if "@" not in email or "." not in email.split("@")[-1]:
-        return jsonify({"status": "Error", "message": "Invalid email format"}), 400
-
-    try:
-        rows = execute_query(
-            "SELECT id FROM users WHERE email = %s",
-            (email,),
-            fetch=True
-        )
-        if rows:
-            return jsonify({"status": "OK", "message": "Email is valid and registered"}), 200
-        return jsonify({"status": "Error", "message": "Email not found"}), 404
-    except (OperationalError, DatabaseError):
-        return jsonify({"status": "Error", "message": "Database connection failed"}), 500
-
 @app.post("/api/login")
 def authenticate():
     data     = request.get_json(silent=True) or request.form or {}
-    username = (data.get("username") or data.get("login_id") or "").strip()
-    password = (data.get("password") or data.get("login_pwd") or "").strip()
+    user_id  = (data.get("user_id") or "").strip()
+    password = (data.get("password") or "").strip()
 
-    if not username or not password:
-        return jsonify({"status": "Error", "message": "username and password are required"}), 400
+    if not user_id or not password:
+        return jsonify({"status": "Error", "message": "user_id and password are required"}), 400
 
     try:
         hashed = hash_password(password)
         rows = execute_query(
-            "SELECT id FROM userbase WHERE (email = %s OR phone = %s) AND password = %s AND account_status = 'active'",
-            (username, username, hashed),
+            "SELECT id, account_status FROM users WHERE (email = %s OR phone_number = %s) AND password = %s",
+            (user_id, user_id, hashed),
             fetch=True
         )
         if rows:
-            return jsonify({"status": "OK"}), 200
-        return jsonify({"status": "Error", "message": "Invalid username or password"}), 401
+            account_status = rows[0][1]
+            if account_status == 'ACTIVE':
+                return jsonify({"status": "OK", "message": "Login successful"}), 200
+            elif account_status == 'BLOCKED':
+                return jsonify({"status": "Error", "message": "Account is blocked"}), 403
+            else:
+                return jsonify({"status": "Error", "message": "Account is inactive"}), 403
+        return jsonify({"status": "Error", "message": "Invalid credentials"}), 401
     except (OperationalError, DatabaseError):
         return jsonify({"status": "Error", "message": "Database connection failed"}), 500
 
 @app.post("/api/signup")
 def signup():
-    data      = request.get_json(silent=True) or request.form or {}
-    full_name = (data.get("full_name") or "").strip()
-    username  = (data.get("username")  or "").strip()
-    email     = (data.get("email")     or "").strip()
-    password  = (data.get("password")  or "").strip()
+    data         = request.get_json(silent=True) or request.form or {}
+    first_name   = (data.get("first_name")   or "").strip()
+    last_name    = (data.get("last_name")    or "").strip()
+    email        = (data.get("email")        or "").strip()
+    phone_number = (data.get("phone_number") or "").strip()
+    password     = (data.get("password")     or "").strip()
 
-    missing = [f for f, v in [("full_name", full_name), ("username", username),
-                               ("email", email), ("password", password)] if not v]
+    missing = [f for f, v in [("first_name", first_name), ("last_name", last_name),
+                               ("email", email), ("phone_number", phone_number),
+                               ("password", password)] if not v]
     if missing:
         return jsonify({"status": "Error", "message": f"Missing required fields: {', '.join(missing)}"}), 400
 
     if "@" not in email or "." not in email.split("@")[-1]:
         return jsonify({"status": "Error", "message": "Invalid email format"}), 400
+
+    if len(phone_number) < 10:
+        return jsonify({"status": "Error", "message": "Phone number must be at least 10 digits"}), 400
 
     if len(password) < 6:
         return jsonify({"status": "Error", "message": "Password must be at least 6 characters"}), 400
@@ -112,14 +100,16 @@ def signup():
     try:
         hashed = hash_password(password)
         execute_query(
-            "INSERT INTO userbase (full_name, email, password) VALUES (%s, %s, %s)",
-            (full_name, email, hashed)
+            "INSERT INTO users (first_name, last_name, email, phone_number, password) VALUES (%s, %s, %s, %s, %s)",
+            (first_name, last_name, email, phone_number, hashed)
         )
-        return jsonify({"status": "OK"}), 201
+        return jsonify({"status": "OK", "message": "User registered successfully"}), 201
     except DatabaseError as e:
-        err = str(e)
-        if "unique" in err.lower() and "email" in err.lower():
+        err = str(e).lower()
+        if "unique" in err and "email" in err:
             return jsonify({"status": "Error", "message": "Email already registered"}), 409
+        if "unique" in err and "phone" in err:
+            return jsonify({"status": "Error", "message": "Phone number already registered"}), 409
         return jsonify({"status": "Error", "message": "Database error"}), 500
     except OperationalError:
         return jsonify({"status": "Error", "message": "Database connection failed"}), 500
