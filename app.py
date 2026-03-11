@@ -45,6 +45,29 @@ def check_connection():
             problem = f"Connection error: {e}"
         return jsonify({"status": "Error", "problem": problem}), 500
 
+@app.post("/api/login/validate-email")
+def validate_email():
+    data  = request.get_json(silent=True) or request.form or {}
+    email = (data.get("email") or "").strip()
+
+    if not email:
+        return jsonify({"status": "Error", "message": "email is required"}), 400
+
+    if "@" not in email or "." not in email.split("@")[-1]:
+        return jsonify({"status": "Error", "message": "Invalid email format"}), 400
+
+    try:
+        rows = execute_query(
+            "SELECT id FROM userbase WHERE email = %s AND account_status = 'active'",
+            (email,),
+            fetch=True
+        )
+        if rows:
+            return jsonify({"status": "OK", "message": "Email is valid and registered"}), 200
+        return jsonify({"status": "Error", "message": "Email not found"}), 404
+    except (OperationalError, DatabaseError):
+        return jsonify({"status": "Error", "message": "Database connection failed"}), 500
+
 @app.post("/api/login")
 def authenticate():
     data     = request.get_json(silent=True) or request.form or {}
