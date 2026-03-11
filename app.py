@@ -2,11 +2,9 @@ import os
 import hashlib
 from dotenv import load_dotenv
 
-load_dotenv()  # loads DATABASE_URL from .env in local dev
+load_dotenv()
 
 from flask import Flask, jsonify, request
-from db import get_connection, execute_query
-from mysql.connector import Error, errorcode
 
 app = Flask(__name__)
 
@@ -16,120 +14,45 @@ def hash_password(password):
 
 @app.route("/")
 def home():
-    return jsonify({
-        "message": "Flask API running on Render"
-    })
-
-@app.route("/api/users")
-def users():
-    return jsonify({
-        "users": ["Tarun", "Amit", "Rahul"]
-    })
+    return jsonify({"message": "Flask API running on Render"})
 
 @app.route("/api/db-check")
 def db_check():
-    """Check database connectivity and return a specific diagnosis on failure."""
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1")
-        cursor.fetchone()
-        cursor.close()
-        conn.close()
-        return jsonify({"status": "OK", "message": "Database connected successfully"}), 200
+    return jsonify({"status": "Pending", "message": "Database not configured yet"}), 503
 
-    except Error as e:
-        code = e.errno
-
-        if not os.environ.get("DATABASE_URL") and not os.environ.get("MYSQLHOST"):
-            problem = "DATABASE_URL environment variable is not set"
-        elif code == errorcode.ER_ACCESS_DENIED_ERROR:
-            problem = "Access denied — wrong username or password"
-        elif code == errorcode.ER_BAD_DB_ERROR:
-            problem = "Database does not exist"
-        elif code == 2003:
-            problem = "Cannot connect to host — wrong host or port, or server is down"
-        elif code == 2005:
-            problem = "Unknown host — check DB_HOST / DATABASE_URL"
-        elif code == 2013:
-            problem = "Connection lost during query — server may have timed out"
-        else:
-            problem = f"MySQL error {code}: {e.msg}"
-
-        return jsonify({"status": "Error", "problem": problem}), 500
-
-
+@app.post("/api/login")
 def authenticate():
     data = request.get_json(silent=True) or request.form or {}
-
     username = (data.get("username") or data.get("login_id") or "").strip()
     password = (data.get("password") or data.get("login_pwd") or "").strip()
 
     if not username or not password:
-        return jsonify({
-            "status": "Error",
-            "message": "username and password are required"
-        }), 400
+        return jsonify({"status": "Error", "message": "username and password are required"}), 400
 
-    try:
-        hashed = hash_password(password)
-        rows = execute_query(
-            "SELECT id FROM userbase WHERE (email = %s OR phone = %s) AND password = %s AND account_status = 'active'",
-            (username, username, hashed),
-            fetch=True
-        )
-        if rows:
-            return jsonify({"status": "OK"}), 200
-        return jsonify({"status": "Error", "message": "Invalid username or password"}), 401
-    except Error:
-        return jsonify({"status": "Error", "message": "Database connection failed"}), 500
+    # TODO: query database once configured
+    return jsonify({"status": "Error", "message": "Database not configured yet"}), 503
 
 @app.post("/api/signup")
 def signup():
     data = request.get_json(silent=True) or request.form or {}
-
     full_name = (data.get("full_name") or "").strip()
     username  = (data.get("username")  or "").strip()
     email     = (data.get("email")     or "").strip()
     password  = (data.get("password")  or "").strip()
 
-    # Validate required fields
     missing = [f for f, v in [("full_name", full_name), ("username", username),
                                ("email", email), ("password", password)] if not v]
     if missing:
-        return jsonify({
-            "status": "Error",
-            "message": f"Missing required fields: {', '.join(missing)}"
-        }), 400
+        return jsonify({"status": "Error", "message": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    # Basic email format check
     if "@" not in email or "." not in email.split("@")[-1]:
-        return jsonify({
-            "status": "Error",
-            "message": "Invalid email format"
-        }), 400
+        return jsonify({"status": "Error", "message": "Invalid email format"}), 400
 
-    # Password length check
     if len(password) < 6:
-        return jsonify({
-            "status": "Error",
-            "message": "Password must be at least 6 characters"
-        }), 400
+        return jsonify({"status": "Error", "message": "Password must be at least 6 characters"}), 400
 
-    # Store user in database
-    try:
-        hashed = hash_password(password)
-        execute_query(
-            "INSERT INTO userbase (full_name, email, password) VALUES (%s, %s, %s)",
-            (full_name, email, hashed)
-        )
-        return jsonify({"status": "OK"}), 201
-    except Error as e:
-        err = str(e)
-        if "Duplicate entry" in err and "email" in err:
-            return jsonify({"status": "Error", "message": "Email already registered"}), 409
-        return jsonify({"status": "Error", "message": "Database connection failed"}), 500
-
+    # TODO: insert into database once configured
+    return jsonify({"status": "Error", "message": "Database not configured yet"}), 503
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5000"))

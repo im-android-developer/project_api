@@ -8,13 +8,5 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.3
-      - key: MYSQLHOST
+      - key: DATABASE_URL
         sync: false
-      - key: MYSQLUSER
-        sync: false
-      - key: MYSQLPASSWORD
-        sync: false
-      - key: MYSQLPORT
-        sync: false
-      - key: MYSQLDATABASE
-        value: StockMarketDB
