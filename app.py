@@ -205,7 +205,7 @@ def update_email_status():
     try:
         # Check if user exists
         rows = execute_query(
-            "SELECT id, email_verified FROM userbase WHERE email = %s",
+            "SELECT id, email_verified FROM users WHERE email = %s",
             (email,),
             fetch=True
         )
@@ -221,7 +221,7 @@ def update_email_status():
 
         # Update email_verified to true (1)
         execute_query(
-            "UPDATE userbase SET email_verified = 1, updated_at = CURRENT_TIMESTAMP WHERE email = %s",
+            "UPDATE users SET email_verified = 1, updated_at = CURRENT_TIMESTAMP WHERE email = %s",
             (email,)
         )
 
