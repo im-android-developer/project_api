@@ -198,10 +198,11 @@ def send_otp():
 @app.post("/api/updatestatus")
 def update_email_status():
     """Update email_verified status for a user."""
-    email = request.headers.get("email", "").strip()
+    data = request.get_json(silent=True) or request.form or {}
+    email = (data.get("email") or "").strip()
 
     if not email:
-        return jsonify({"status": "Error", "message": "Email is required in header"}), 400
+        return jsonify({"status": "Error", "message": "Email is required"}), 400
 
     try:
         # Check if user exists
