@@ -177,13 +177,21 @@ def send_otp():
         send_email(email, subject, body)
         return jsonify({"status": "OK", "message": "OTP sent successfully"}), 200
     except ValueError as e:
-        return jsonify({"status": "Error", "message": str(e)}), 500
+        return jsonify({"status": "Error", "message": str(e), "reason": "SMTP credentials (SMTP_USERNAME or SMTP_PASSWORD) not configured in environment variables"}), 500
     except smtplib.SMTPAuthenticationError:
-        return jsonify({"status": "Error", "message": "SMTP authentication failed"}), 500
+        return jsonify({"status": "Error", "message": "SMTP authentication failed", "reason": "Invalid SMTP_USERNAME or SMTP_PASSWORD. If using Gmail, ensure you are using an App Password (not your regular password) with 2-Step Verification enabled"}), 500
+    except smtplib.SMTPRecipientsRefused:
+        return jsonify({"status": "Error", "message": "Recipient email rejected", "reason": "The recipient email address was rejected by the mail server. Check if the email address is valid"}), 500
+    except smtplib.SMTPSenderRefused:
+        return jsonify({"status": "Error", "message": "Sender email rejected", "reason": "The sender email (SMTP_FROM_EMAIL) was rejected. Ensure it matches your SMTP account"}), 500
+    except smtplib.SMTPConnectError:
+        return jsonify({"status": "Error", "message": "Failed to connect to SMTP server", "reason": f"Cannot connect to {SMTP_HOST}:{SMTP_PORT}. Check SMTP_HOST and SMTP_PORT environment variables"}), 500
+    except smtplib.SMTPServerDisconnected:
+        return jsonify({"status": "Error", "message": "SMTP server disconnected", "reason": "Connection to SMTP server was lost. This may be due to network issues or server timeout"}), 500
     except smtplib.SMTPException as e:
-        return jsonify({"status": "Error", "message": f"Failed to send email: {str(e)}"}), 500
+        return jsonify({"status": "Error", "message": f"Failed to send email: {str(e)}", "reason": "General SMTP error. Check SMTP configuration and ensure all environment variables are correctly set"}), 500
     except Exception as e:
-        return jsonify({"status": "Error", "message": f"Unexpected error: {str(e)}"}), 500
+        return jsonify({"status": "Error", "message": f"Unexpected error: {str(e)}", "reason": "An unexpected error occurred. Check server logs for more details"}), 500
 
 
 @app.post("/api/updatestatus")
