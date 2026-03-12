@@ -218,12 +218,12 @@ def update_email_status():
         current_status = rows[0]['email_verified']
 
         # If already verified, return success
-        if current_status == 1:
+        if current_status == True:
             return jsonify({"status": "OK", "message": "Email already verified"}), 200
 
-        # Update email_verified to true (1)
+        # Update email_verified to true
         execute_query(
-            "UPDATE users SET email_verified = 1, updated_at = CURRENT_TIMESTAMP WHERE email = %s",
+            "UPDATE users SET email_verified = TRUE, updated_at = CURRENT_TIMESTAMP WHERE email = %s",
             (email,)
         )
 
