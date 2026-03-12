@@ -72,7 +72,7 @@ def authenticate():
             fetch=True
         )
         if rows:
-            account_status = rows[0][1]
+            account_status = rows[0]['account_status']
             if account_status == 'ACTIVE':
                 return jsonify({"status": "OK", "message": "Login successful"}), 200
             elif account_status == 'BLOCKED':
@@ -213,7 +213,7 @@ def update_email_status():
         if not rows:
             return jsonify({"status": "Error", "message": "User not found"}), 404
 
-        current_status = rows[0][1]
+        current_status = rows[0]['email_verified']
 
         # If already verified, return success
         if current_status == 1:
