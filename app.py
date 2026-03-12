@@ -148,13 +148,14 @@ def send_email(to_email, subject, body):
 @app.post("/api/sendotp")
 def send_otp():
     """Send OTP to the specified email address."""
-    email = request.headers.get("email", "").strip()
-    otp = request.headers.get("otp", "").strip()
+    data = request.get_json(silent=True) or request.form or {}
+    email = (data.get("email") or "").strip()
+    otp = (data.get("otp") or "").strip()
 
     if not email:
-        return jsonify({"status": "Error", "message": "Email is required in header"}), 400
+        return jsonify({"status": "Error", "message": "Email is required"}), 400
     if not otp:
-        return jsonify({"status": "Error", "message": "OTP is required in header"}), 400
+        return jsonify({"status": "Error", "message": "OTP is required"}), 400
 
     try:
         subject = "Your OTP Verification Code"
