@@ -1,5 +1,8 @@
 import os
 import hashlib
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -7,6 +10,13 @@ load_dotenv()
 from flask import Flask, jsonify, request
 from db import get_connection, execute_query
 from psycopg2 import OperationalError, DatabaseError
+
+# SMTP Configuration (set these in Render environment variables)
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+SMTP_FROM_EMAIL = os.environ.get("SMTP_FROM_EMAIL", SMTP_USERNAME)
 
 app = Flask(__name__)
 
@@ -116,6 +126,101 @@ def signup():
         return jsonify({"status": "Error", "message": "Database error"}), 500
     except OperationalError:
         return jsonify({"status": "Error", "message": "Database connection failed"}), 500
+
+
+def send_email(to_email, subject, body):
+    """Send email using SMTP configuration."""
+    if not SMTP_USERNAME or not SMTP_PASSWORD:
+        raise ValueError("SMTP credentials not configured")
+
+    msg = MIMEMultipart()
+    msg['From'] = SMTP_FROM_EMAIL
+    msg['To'] = to_email
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'html'))
+
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+        server.starttls()
+        server.login(SMTP_USERNAME, SMTP_PASSWORD)
+        server.sendmail(SMTP_FROM_EMAIL, to_email, msg.as_string())
+
+
+@app.post("/api/sendotp")
+def send_otp():
+    """Send OTP to the specified email address."""
+    email = request.headers.get("email", "").strip()
+    otp = request.headers.get("otp", "").strip()
+
+    if not email:
+        return jsonify({"status": "Error", "message": "Email is required in header"}), 400
+    if not otp:
+        return jsonify({"status": "Error", "message": "OTP is required in header"}), 400
+
+    try:
+        subject = "Your OTP Verification Code"
+        body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>OTP Verification</h2>
+            <p>Dear User,</p>
+            <p>Your One-Time Password (OTP) for verification is:</p>
+            <div style="background-color: #f4f4f4; padding: 15px; border-radius: 5px; text-align: center;">
+                <h1 style="color: #333; letter-spacing: 5px;">{otp}</h1>
+            </div>
+            <p>This OTP is valid for a limited time. Please do not share it with anyone.</p>
+            <p>If you did not request this OTP, please ignore this email.</p>
+            <br>
+            <p>Best regards,<br>Support Team</p>
+        </body>
+        </html>
+        """
+        send_email(email, subject, body)
+        return jsonify({"status": "OK", "message": "OTP sent successfully"}), 200
+    except ValueError as e:
+        return jsonify({"status": "Error", "message": str(e)}), 500
+    except smtplib.SMTPAuthenticationError:
+        return jsonify({"status": "Error", "message": "SMTP authentication failed"}), 500
+    except smtplib.SMTPException as e:
+        return jsonify({"status": "Error", "message": f"Failed to send email: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"status": "Error", "message": f"Unexpected error: {str(e)}"}), 500
+
+
+@app.post("/api/updatestatus")
+def update_email_status():
+    """Update email_verified status for a user."""
+    email = request.headers.get("email", "").strip()
+
+    if not email:
+        return jsonify({"status": "Error", "message": "Email is required in header"}), 400
+
+    try:
+        # Check if user exists
+        rows = execute_query(
+            "SELECT id, email_verified FROM userbase WHERE email = %s",
+            (email,),
+            fetch=True
+        )
+
+        if not rows:
+            return jsonify({"status": "Error", "message": "User not found"}), 404
+
+        current_status = rows[0][1]
+
+        # If already verified, return success
+        if current_status == 1:
+            return jsonify({"status": "OK", "message": "Email already verified"}), 200
+
+        # Update email_verified to true (1)
+        execute_query(
+            "UPDATE userbase SET email_verified = 1, updated_at = CURRENT_TIMESTAMP WHERE email = %s",
+            (email,)
+        )
+
+        return jsonify({"status": "OK", "message": "Email verified successfully"}), 200
+    except (OperationalError, DatabaseError) as e:
+        return jsonify({"status": "Error", "message": "Database error"}), 500
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5000"))
