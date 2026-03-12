@@ -14,7 +14,7 @@ from psycopg2 import OperationalError, DatabaseError
 # SMTP Configuration (set these in Render environment variables)
 SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
-SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "tradesphere")
+SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "enfec.tarunbansal@gmail.com")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "vffbushrlfxoczmc")
 SMTP_FROM_EMAIL = os.environ.get("SMTP_FROM_EMAIL", "enfec.tarunbansal@gmail.com")
 
