@@ -10,3 +10,13 @@ services:
         value: 3.12.3
       - key: DATABASE_URL
         sync: false
+
+  - type: web
+    name: project-websocket
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --worker-class eventlet -w 1 websocket_ticks:app
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.3
