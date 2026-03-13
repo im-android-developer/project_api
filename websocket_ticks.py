@@ -1,14 +1,12 @@
-import eventlet
-eventlet.monkey_patch()
-
 import json
+import threading
 import time
 from flask import Flask, jsonify
 from flask_socketio import SocketIO, emit
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # Load JSON data
 def load_ticks_data():
@@ -24,7 +22,7 @@ def load_ticks_data():
 # Global state
 ticks_data = load_ticks_data()
 connected_clients = set()
-broadcast_threads = {}  # Track broadcast greenlet per client
+broadcast_threads = {}  # Track broadcast thread per client
 
 
 class TickBroadcaster:
@@ -34,7 +32,7 @@ class TickBroadcaster:
         self.client_id = client_id
         self.current_index = 0
         self.running = False
-        self.greenlet = None
+        self.thread = None
     
     def start(self):
         """Start broadcasting ticks"""
@@ -43,13 +41,12 @@ class TickBroadcaster:
         
         self.running = True
         self.current_index = 0
-        self.greenlet = eventlet.spawn(self._broadcast_loop)
+        self.thread = threading.Thread(target=self._broadcast_loop, daemon=True)
+        self.thread.start()
     
     def stop(self):
         """Stop broadcasting"""
         self.running = False
-        if self.greenlet:
-            self.greenlet.kill()
     
     def _broadcast_loop(self):
         """Main broadcast loop - sends tick every 3 seconds"""
@@ -74,7 +71,7 @@ class TickBroadcaster:
             
             # Wait 3 seconds before next tick
             if self.running and self.current_index < len(ticks_data):
-                eventlet.sleep(3)
+                time.sleep(3)
         
         # Reached end of data
         if self.running and self.current_index >= len(ticks_data):
