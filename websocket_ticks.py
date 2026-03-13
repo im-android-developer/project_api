@@ -5,7 +5,7 @@ from flask import Flask, jsonify
 from flask_socketio import SocketIO, emit
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key'
+app.config['SECRET_KEY'] = 'f9e4bbf6ee3e71f192f45073e9bf025bbb9d3438e216482e487f3233ca7668de'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # Load JSON data
