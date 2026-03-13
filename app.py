@@ -3,6 +3,7 @@ import json
 import hashlib
 import smtplib
 import threading
+from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
@@ -107,7 +108,8 @@ class TickBroadcaster:
                     'is_last': self.current_index == len(ticks_data) - 1
                 }, room=self.client_id)
                 
-                print(f"Sent sequence {event.get('sequence')} to client {self.client_id}")
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                print(f"[{timestamp}] Sent sequence {event.get('sequence')} to client {self.client_id}")
             
             self.current_index += 1
             
@@ -121,7 +123,8 @@ class TickBroadcaster:
                 'total_sequences': len(ticks_data)
             }, room=self.client_id)
             self.running = False
-            print(f"Broadcast completed for client {self.client_id}")
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"[{timestamp}] Broadcast completed for client {self.client_id}")
 
 @app.route("/")
 def home():
@@ -338,7 +341,8 @@ def handle_connect():
     """Handle new WebSocket connection"""
     client_id = request.sid
     connected_clients.add(client_id)
-    print(f"Client connected: {client_id}")
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    print(f"[{timestamp}] Client connected: {client_id}")
     
     emit('connection_status', {
         'status': 'connected',
@@ -358,7 +362,8 @@ def handle_disconnect():
         del broadcast_threads[client_id]
     
     connected_clients.discard(client_id)
-    print(f"Client disconnected: {client_id}")
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    print(f"[{timestamp}] Client disconnected: {client_id}")
 
 
 @socketio.on('start_ticks')
