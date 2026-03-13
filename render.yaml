@@ -2,7 +2,7 @@ services:
   - type: web
     name: system-project-api
     runtime: python
-    pythonVersion: "3.12.3"
+    pythonVersion: "3.11.4"
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn --threads 100 -w 1 --timeout 120 app:app
     autoDeploy: true
