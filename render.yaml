@@ -1,22 +1,17 @@
 services:
   - type: web
     name: project-api
-    env: python
+    runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
     autoDeploy: true
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.3
       - key: DATABASE_URL
         sync: false
 
   - type: web
     name: project-websocket
-    env: python
+    runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn --worker-class eventlet -w 1 websocket_ticks:app
     autoDeploy: true
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.3
