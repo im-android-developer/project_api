@@ -1,19 +1,11 @@
 services:
   - type: web
-    name: project-api
+    name: system-project-api
     runtime: python
     pythonVersion: "3.12.3"
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: gunicorn --threads 100 -w 1 app:app
     autoDeploy: true
     envVars:
       - key: DATABASE_URL
         sync: false
-
-  - type: web
-    name: project-websocket
-    runtime: python
-    pythonVersion: "3.12.3"
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --threads 100 -w 1 websocket_ticks:app
-    autoDeploy: true

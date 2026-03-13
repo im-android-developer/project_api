@@ -1,13 +1,15 @@
 # API Documentation
 
-## REST API (app.py)
-
 Base URL (local): `http://localhost:5000`  
 Base URL (production): `https://system-project-api.onrender.com`
 
+WebSocket Endpoint: `https://system-project-api.onrender.com/socket.io/`
+
 ---
 
-## 1. Health Check
+## REST API Endpoints
+
+### 1. Health Check
 
 **GET** `/`
 
@@ -16,13 +18,15 @@ Returns a simple status message to confirm the API is running.
 **Response — 200 OK**
 ```json
 {
-  "message": "Flask API running on Render"
+  "message": "Flask API running on Render",
+  "websocket_endpoint": "/socket.io/",
+  "total_tick_sequences": 3601
 }
 ```
 
 ---
 
-## 2. Check Database Connection
+### 2. Check Database Connection
 
 **GET** `/api/checkconnection`
 
@@ -44,12 +48,12 @@ Tests PostgreSQL database connectivity and diagnoses connection issues.
 
 **Example Request**
 ```bash
-curl http://localhost:5000/api/checkconnection
+curl https://system-project-api.onrender.com/api/checkconnection
 ```
 
 ---
 
-## 3. Login
+### 3. Login
 
 **POST** `/api/login`
 
@@ -75,14 +79,14 @@ Authenticates a user with their email or phone number and password.
 
 **Example Request**
 ```bash
-curl -X POST http://localhost:5000/api/login \
+curl -X POST https://system-project-api.onrender.com/api/login \
   -H "Content-Type: application/json" \
   -d '{"user_id": "john@example.com", "password": "secret123"}'
 ```
 
 ---
 
-## 4. Signup
+### 4. Signup
 
 **POST** `/api/signup`
 
@@ -115,14 +119,14 @@ Registers a new user account.
 
 **Example Request**
 ```bash
-curl -X POST http://localhost:5000/api/signup \
+curl -X POST https://system-project-api.onrender.com/api/signup \
   -H "Content-Type: application/json" \
   -d '{"first_name": "John", "last_name": "Doe", "email": "john@example.com", "username": "johndoe", "phone_number": "1234567890", "password": "secret123"}'
 ```
 
 ---
 
-## 5. Send OTP
+### 5. Send OTP
 
 **POST** `/api/sendotp`
 
@@ -143,19 +147,17 @@ Sends an OTP verification code to the specified email address.
 | 400 | `{"status": "Error", "message": "Email is required"}` | Missing email |
 | 400 | `{"status": "Error", "message": "OTP is required"}` | Missing OTP |
 | 500 | `{"status": "Error", "message": "SMTP authentication failed", "reason": "..."}` | SMTP auth error |
-| 500 | `{"status": "Error", "message": "Recipient email rejected", "reason": "..."}` | Invalid recipient |
-| 500 | `{"status": "Error", "message": "Failed to connect to SMTP server", "reason": "..."}` | SMTP connection error |
 
 **Example Request**
 ```bash
-curl -X POST http://localhost:5000/api/sendotp \
+curl -X POST https://system-project-api.onrender.com/api/sendotp \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "otp": "123456"}'
 ```
 
 ---
 
-## 6. Update Email Status
+### 6. Update Email Status
 
 **POST** `/api/updatestatus`
 
@@ -179,50 +181,24 @@ Marks a user's email as verified.
 
 **Example Request**
 ```bash
-curl -X POST http://localhost:5000/api/updatestatus \
+curl -X POST https://system-project-api.onrender.com/api/updatestatus \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com"}'
 ```
 
 ---
 
----
-
-# WebSocket Tick Server (websocket_ticks.py)
-
-Base URL (local): `http://localhost:5001`  
-Base URL (production): `https://project-websocket.onrender.com`
-
-WebSocket Endpoint: `/socket.io/`
-
----
-
-## REST Endpoints
-
-### Health Check
-
-**GET** `/`
-
-**Response — 200 OK**
-```json
-{
-  "message": "WebSocket Tick Server Running",
-  "websocket_endpoint": "/socket.io/",
-  "total_sequences": 1500
-}
-```
-
-### Ticks Info
+### 7. Ticks Info
 
 **GET** `/api/ticks/info`
 
-Returns information about available tick data.
+Returns information about available tick data for WebSocket streaming.
 
 **Response — 200 OK**
 ```json
 {
   "status": "OK",
-  "total_sequences": 1500,
+  "total_sequences": 3601,
   "connected_clients": 3,
   "broadcast_interval": "3 seconds"
 }
@@ -230,25 +206,29 @@ Returns information about available tick data.
 
 ---
 
+---
+
 ## WebSocket Events
+
+WebSocket Endpoint: `https://system-project-api.onrender.com/socket.io/`
 
 ### Connection Flow
 
 ```
-Android App                          Server
-    |                                   |
-    |-------- Connect WebSocket ------->|
-    |<------ connection_status ---------|
-    |                                   |
-    |-------- start_ticks ------------->|
-    |<------ tick_data (STARTED) -------|
-    |<------ tick_data (sequence 1) ----|  (3 sec)
-    |<------ tick_data (sequence 2) ----|  (3 sec)
-    |<------ tick_data (sequence 3) ----|  (3 sec)
-    |           ...                     |
-    |<------ tick_data (COMPLETED) -----|
-    |                                   |
-    |-------- Reconnect --------------->|  (to restart from 1)
+Android App                              Server
+    |                                       |
+    |-------- Connect WebSocket ----------->|
+    |<------ connection_status -------------|
+    |                                       |
+    |-------- start_ticks ----------------->|
+    |<------ tick_data (STARTED) -----------|
+    |<------ tick_data (sequence 1) --------|  (3 sec)
+    |<------ tick_data (sequence 2) --------|  (3 sec)
+    |<------ tick_data (sequence 3) --------|  (3 sec)
+    |           ...                         |
+    |<------ tick_data (COMPLETED) ---------|
+    |                                       |
+    |-------- Reconnect ------------------->|  (to restart from 1)
 ```
 
 ---
@@ -266,7 +246,7 @@ Start receiving tick data. Broadcasts begin from sequence 1.
 {
   "status": "STARTED",
   "message": "Tick broadcasting started",
-  "total_sequences": 1500
+  "total_sequences": 3601
 }
 ```
 
@@ -298,7 +278,7 @@ Sent immediately upon WebSocket connection.
 {
   "status": "connected",
   "client_id": "abc123xyz",
-  "total_sequences": 1500,
+  "total_sequences": 3601,
   "message": "Send \"start_ticks\" event to begin receiving data"
 }
 ```
@@ -343,15 +323,7 @@ Sent every 3 seconds after `start_ticks` is triggered.
 {
   "status": "COMPLETED",
   "message": "All sequences sent. Reconnect to restart.",
-  "total_sequences": 1500
-}
-```
-
-**On Error:**
-```json
-{
-  "status": "Error",
-  "message": "No tick data available"
+  "total_sequences": 3601
 }
 ```
 
@@ -376,8 +348,9 @@ class TickService {
     fun connect() {
         val options = IO.Options().apply {
             transports = arrayOf("websocket")
+            secure = true
         }
-        socket = IO.socket("https://project-websocket.onrender.com", options)
+        socket = IO.socket("https://system-project-api.onrender.com", options)
         
         socket.on(Socket.EVENT_CONNECT) {
             println("Connected to WebSocket")
@@ -418,6 +391,25 @@ class TickService {
         socket.disconnect()
     }
 }
+```
+
+---
+
+## Testing WebSocket
+
+### Browser Console Test
+```javascript
+var s = document.createElement('script');
+s.src = 'https://cdn.socket.io/4.5.4/socket.io.min.js';
+s.onload = () => {
+    const socket = io('https://system-project-api.onrender.com');
+    socket.on('connect', () => {
+        console.log('Connected!');
+        socket.emit('start_ticks');
+    });
+    socket.on('tick_data', console.log);
+};
+document.head.appendChild(s);
 ```
 
 ---
