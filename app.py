@@ -2,8 +2,6 @@ import os
 import json
 import hashlib
 import smtplib
-import threading
-import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
@@ -24,7 +22,7 @@ SMTP_FROM_EMAIL = os.environ.get("SMTP_FROM_EMAIL", "enfec.tarunbansal@gmail.com
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'f9e4bbf6ee3e71f192f45073e9bf025bbb9d3438e216482e487f3233ca7668de'
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 
 # ==================== UTILITY FUNCTIONS ====================
@@ -77,7 +75,6 @@ class TickBroadcaster:
         self.client_id = client_id
         self.current_index = 0
         self.running = False
-        self.thread = None
     
     def start(self):
         """Start broadcasting ticks"""
@@ -86,8 +83,7 @@ class TickBroadcaster:
         
         self.running = True
         self.current_index = 0
-        self.thread = threading.Thread(target=self._broadcast_loop, daemon=True)
-        self.thread.start()
+        socketio.start_background_task(self._broadcast_loop)
     
     def stop(self):
         """Stop broadcasting"""
@@ -114,7 +110,7 @@ class TickBroadcaster:
             self.current_index += 1
             
             if self.running and self.current_index < len(ticks_data):
-                time.sleep(3)
+                socketio.sleep(3)
         
         if self.running and self.current_index >= len(ticks_data):
             socketio.emit('tick_data', {
