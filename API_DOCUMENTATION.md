@@ -188,7 +188,121 @@ curl -X POST https://system-project-api.onrender.com/api/updatestatus \
 
 ---
 
-### 7. Ticks Info
+### 7. Forgot Password
+
+**POST** `/api/forgotpassword`
+
+Initiates a password reset by verifying the provided email or phone number exists in the system and sending an OTP to the registered email address.
+
+**Request Body** (`application/json` or `form-data`)
+
+**Headers**
+
+| Header         | Value              | Required |
+|----------------|--------------------|----------|
+| `Content-Type` | `application/json` | ✅       |
+
+| Field          | Type   | Required | Description                                      |
+|----------------|--------|----------|--------------------------------------------------|
+| `email`        | string | ❌       | User's registered email address                  |
+| `phone_number` | string | ❌       | User's registered phone number                   |
+
+> **Note:** At least one of `email` or `phone_number` must be provided. If both are provided, `email` takes priority.
+
+**Responses**
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| 200 | `{"status": "OK", "message": "OTP sent successfully to the registered email", "otp": "482917"}` | OTP generated and sent to the user's email |
+| 400 | `{"status": "Error", "message": "Email or phone number is required"}` | Neither email nor phone number provided |
+| 404 | `{"status": "Error", "message": "No account found with the provided email or phone number"}` | No matching user found |
+| 500 | `{"status": "Error", "message": "SMTP authentication failed"}` | SMTP auth error |
+| 500 | `{"status": "Error", "message": "Failed to send email: <details>"}` | Email sending failed |
+| 500 | `{"status": "Error", "message": "Database connection failed"}` | Database error |
+
+**Example Request (with email)**
+```bash
+curl -X POST https://system-project-api.onrender.com/api/forgotpassword \
+  -H "Content-Type: application/json" \
+  -d '{"email": "john@example.com"}'
+```
+
+**Example Request (with phone number)**
+```bash
+curl -X POST https://system-project-api.onrender.com/api/forgotpassword \
+  -H "Content-Type: application/json" \
+  -d '{"phone_number": "1234567890"}'
+```
+
+**Success Response**
+```json
+{
+  "status": "OK",
+  "message": "OTP sent successfully to the registered email",
+  "otp": "482917"
+}
+```
+
+---
+
+### 8. Reset Password
+
+**POST** `/api/resetpassword`
+
+Updates the user's password after OTP verification. Finds the user by email or phone number and updates the password.
+
+**Headers**
+
+| Header         | Value              | Required |
+|----------------|--------------------|----------|
+| `Content-Type` | `application/json` | ✅       |
+
+**Request Body** (`application/json` or `form-data`)
+
+| Field          | Type   | Required | Description                                      |
+|----------------|--------|----------|--------------------------------------------------|
+| `email`        | string | ❌       | User's registered email address                  |
+| `phone_number` | string | ❌       | User's registered phone number                   |
+| `password`     | string | ✅       | New password (min. 6 characters)                 |
+
+> **Note:** At least one of `email` or `phone_number` must be provided. If both are provided, `email` takes priority.
+
+**Responses**
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| 200 | `{"status": "OK", "message": "Password updated successfully"}` | Password updated |
+| 400 | `{"status": "Error", "message": "Email or phone number is required"}` | Neither email nor phone number provided |
+| 400 | `{"status": "Error", "message": "Password is required"}` | Password not provided |
+| 400 | `{"status": "Error", "message": "Password must be at least 6 characters"}` | Password too short |
+| 404 | `{"status": "Error", "message": "No account found with the provided email or phone number"}` | No matching user found |
+| 500 | `{"status": "Error", "message": "Database connection failed"}` | Database error |
+
+**Example Request (with email)**
+```bash
+curl -X POST https://system-project-api.onrender.com/api/resetpassword \
+  -H "Content-Type: application/json" \
+  -d '{"email": "john@example.com", "password": "newpassword123"}'
+```
+
+**Example Request (with phone number)**
+```bash
+curl -X POST https://system-project-api.onrender.com/api/resetpassword \
+  -H "Content-Type: application/json" \
+  -d '{"phone_number": "1234567890", "password": "newpassword123"}'
+```
+
+**Success Response**
+```json
+{
+  "status": "OK",
+  "message": "Password updated successfully"
+}
+```
+
+---
+
+### 9. Ticks Info
 
 **GET** `/api/ticks/info`
 

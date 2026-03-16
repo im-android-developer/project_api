@@ -1,6 +1,7 @@
 import os
 import json
 import hashlib
+import random
 import smtplib
 import threading
 from datetime import datetime
@@ -319,6 +320,123 @@ def update_email_status():
         return jsonify({"status": "OK", "message": "Email verified successfully"}), 200
     except (OperationalError, DatabaseError) as e:
         return jsonify({"status": "Error", "message": "Database error"}), 500
+
+
+@app.post("/api/forgotpassword")
+def forgot_password():
+    """Send OTP for password reset after verifying email or phone exists."""
+    data = request.get_json(silent=True) or request.form or {}
+    email = (data.get("email") or "").strip()
+    phone_number = (data.get("phone_number") or "").strip()
+
+    if not email and not phone_number:
+        return jsonify({"status": "Error", "message": "Email or phone number is required"}), 400
+
+    try:
+        # Check if the user exists by email or phone_number
+        if email:
+            rows = execute_query(
+                "SELECT id, email FROM users WHERE email = %s",
+                (email,),
+                fetch=True
+            )
+        else:
+            rows = execute_query(
+                "SELECT id, email FROM users WHERE phone_number = %s",
+                (phone_number,),
+                fetch=True
+            )
+
+        if not rows:
+            return jsonify({"status": "Error", "message": "No account found with the provided email or phone number"}), 404
+
+        user_email = rows[0]['email']
+
+        # Generate a 6-digit OTP
+        otp = str(random.randint(100000, 999999))
+
+        # Send OTP to the user's email
+        subject = "Password Reset OTP"
+        body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>Password Reset Request</h2>
+            <p>Dear User,</p>
+            <p>We received a request to reset your password. Use the OTP below to proceed:</p>
+            <div style="background-color: #f4f4f4; padding: 15px; border-radius: 5px; text-align: center;">
+                <h1 style="color: #333; letter-spacing: 5px;">{otp}</h1>
+            </div>
+            <p>This OTP is valid for a limited time. Please do not share it with anyone.</p>
+            <p>If you did not request a password reset, please ignore this email.</p>
+            <br>
+            <p>Best regards,<br>Support Team</p>
+        </body>
+        </html>
+        """
+        send_email(user_email, subject, body)
+
+        return jsonify({"status": "OK", "message": "OTP sent successfully to the registered email", "otp": otp}), 200
+
+    except smtplib.SMTPAuthenticationError:
+        return jsonify({"status": "Error", "message": "SMTP authentication failed"}), 500
+    except smtplib.SMTPException as e:
+        return jsonify({"status": "Error", "message": f"Failed to send email: {str(e)}"}), 500
+    except (OperationalError, DatabaseError):
+        return jsonify({"status": "Error", "message": "Database connection failed"}), 500
+
+
+@app.post("/api/resetpassword")
+def reset_password():
+    """Update user password after forgot password verification."""
+    data = request.get_json(silent=True) or request.form or {}
+    email = (data.get("email") or "").strip()
+    phone_number = (data.get("phone_number") or "").strip()
+    password = (data.get("password") or "").strip()
+
+    if not email and not phone_number:
+        return jsonify({"status": "Error", "message": "Email or phone number is required"}), 400
+
+    if not password:
+        return jsonify({"status": "Error", "message": "Password is required"}), 400
+
+    if len(password) < 6:
+        return jsonify({"status": "Error", "message": "Password must be at least 6 characters"}), 400
+
+    try:
+        # Check if user exists
+        if email:
+            rows = execute_query(
+                "SELECT id FROM users WHERE email = %s",
+                (email,),
+                fetch=True
+            )
+        else:
+            rows = execute_query(
+                "SELECT id FROM users WHERE phone_number = %s",
+                (phone_number,),
+                fetch=True
+            )
+
+        if not rows:
+            return jsonify({"status": "Error", "message": "No account found with the provided email or phone number"}), 404
+
+        # Update password
+        hashed = hash_password(password)
+        if email:
+            execute_query(
+                "UPDATE users SET password = %s, updated_at = CURRENT_TIMESTAMP WHERE email = %s",
+                (hashed, email)
+            )
+        else:
+            execute_query(
+                "UPDATE users SET password = %s, updated_at = CURRENT_TIMESTAMP WHERE phone_number = %s",
+                (hashed, phone_number)
+            )
+
+        return jsonify({"status": "OK", "message": "Password updated successfully"}), 200
+
+    except (OperationalError, DatabaseError):
+        return jsonify({"status": "Error", "message": "Database connection failed"}), 500
 
 
 # ==================== TICK DATA ENDPOINTS ====================
