@@ -1,0 +1,104 @@
+{
+  "companies": [
+    {
+      "symbol": "RELIANCE",
+      "name": "Reliance Industries Ltd",
+      "logo": "https://gstindia.asia/data/reliance.png"
+    },
+    {
+      "symbol": "HDFCBANK",
+      "name": "HDFC Bank Ltd",
+      "logo": "https://gstindia.asia/data/hdfc.png"
+    },
+    {
+      "symbol": "TCS",
+      "name": "Tata Consultancy Services Ltd",
+      "logo": "https://gstindia.asia/data/tcs.png"
+    },
+    {
+      "symbol": "ICICIBANK",
+      "name": "ICICI Bank Ltd",
+      "logo": "https://gstindia.asia/data/icici.png"
+    },
+    {
+      "symbol": "BHARTIARTL",
+      "name": "Bharti Airtel Ltd",
+      "logo": "https://gstindia.asia/data/airtel.png"
+    },
+    {
+      "symbol": "INFY",
+      "name": "Infosys Ltd",
+      "logo": "https://gstindia.asia/data/infosys.png"
+    },
+    {
+      "symbol": "SBIN",
+      "name": "State Bank of India",
+      "logo": "https://gstindia.asia/data/sbin.png"
+    },
+    {
+      "symbol": "LICI",
+      "name": "LIC India",
+      "logo": "https://gstindia.asia/data/lic.png"
+    },
+    {
+      "symbol": "HINDUNILVR",
+      "name": "HUL",
+      "logo": "https://gstindia.asia/data/hul.png"
+    },
+    {
+      "symbol": "ITC",
+      "name": "ITC Ltd",
+      "logo": "https://gstindia.asia/data/itc.png"
+    },
+    {
+      "symbol": "BAJFINANCE",
+      "name": "Bajaj Finance",
+      "logo": "https://gstindia.asia/data/bajaj.png"
+    },
+    {
+      "symbol": "MARUTI",
+      "name": "Maruti Suzuki",
+      "logo": "https://gstindia.asia/data/maruti.png"
+    },
+    {
+      "symbol": "LT",
+      "name": "L&T",
+      "logo": "https://gstindia.asia/data/lt.png"
+    },
+    {
+      "symbol": "SUNPHARMA",
+      "name": "Sun Pharma",
+      "logo": "https://gstindia.asia/data/sun.png"
+    },
+    {
+      "symbol": "NTPC",
+      "name": "NTPC",
+      "logo": "https://gstindia.asia/data/ntpc.png"
+    },
+    {
+      "symbol": "AXISBANK",
+      "name": "Axis Bank",
+      "logo": "https://gstindia.asia/data/axis.png"
+    },
+    {
+      "symbol": "TATAMOTORS",
+      "name": "Tata Motors",
+      "logo": "https://gstindia.asia/data/tata.png"
+    },
+    {
+      "symbol": "HCLTECH",
+      "name": "HCL Tech",
+      "logo": "https://gstindia.asia/data/hcl.png"
+    },
+    {
+      "symbol": "TATASTEEL",
+      "name": "Tata Steel",
+      "logo": "https://gstindia.asia/data/tatasteel.png"
+    },
+    {
+      "symbol": "M_M",
+      "name": "Mahindra & Mahindra",
+      "logo": "https://gstindia.asia/data/mahindra.png"
+    }
+  ]
+}
