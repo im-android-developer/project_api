@@ -65,10 +65,33 @@ def load_ticks_data():
         return []
 
 
+def load_companies_data():
+    """Load companies data from companies.json"""
+    try:
+        with open('companies.json', 'r') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Error loading companies data: {e}")
+        return {}
+
+
+def load_market_data():
+    """Load market data from market_data.json"""
+    try:
+        with open('market_data.json', 'r') as f:
+            data = json.load(f)
+            return data.get('events', [])
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Error loading market data: {e}")
+        return []
+
+
 # Global state for WebSocket
 ticks_data = load_ticks_data()
+market_data = load_market_data()
 connected_clients = set()
 broadcast_threads = {}
+market_broadcast_threads = {}
 
 
 class TickBroadcaster:
@@ -126,6 +149,63 @@ class TickBroadcaster:
             self.running = False
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             print(f"[{timestamp}] Broadcast completed for client {self.client_id}")
+
+class MarketDataBroadcaster:
+    """Manages market data broadcasting for a client"""
+
+    def __init__(self, client_id):
+        self.client_id = client_id
+        self.current_index = 0
+        self.running = False
+
+    def start(self):
+        """Start broadcasting market data"""
+        if self.running:
+            return
+
+        self.running = True
+        self.current_index = 0
+        thread = threading.Thread(target=self._broadcast_loop, daemon=True)
+        thread.start()
+
+    def stop(self):
+        """Stop broadcasting"""
+        self.running = False
+
+    def _broadcast_loop(self):
+        """Main broadcast loop - sends market data every 3 seconds"""
+        while self.running and self.current_index < len(market_data):
+            if self.client_id not in connected_clients:
+                self.running = False
+                break
+
+            event = market_data[self.current_index]
+
+            if event and 'sequence' in event:
+                socketio.emit('market_data', {
+                    'status': 'OK',
+                    'data': event,
+                    'is_last': self.current_index == len(market_data) - 1
+                }, room=self.client_id)
+
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                print(f"[{timestamp}] Sent market sequence {event.get('sequence')} to client {self.client_id}")
+
+            self.current_index += 1
+
+            if self.running and self.current_index < len(market_data):
+                socketio.sleep(3)
+
+        if self.running and self.current_index >= len(market_data):
+            socketio.emit('market_data', {
+                'status': 'COMPLETED',
+                'message': 'All market data sequences sent. Reconnect to restart.',
+                'total_sequences': len(market_data)
+            }, room=self.client_id)
+            self.running = False
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"[{timestamp}] Market data broadcast completed for client {self.client_id}")
+
 
 @app.route("/")
 def home():
@@ -439,6 +519,17 @@ def reset_password():
         return jsonify({"status": "Error", "message": "Database connection failed"}), 500
 
 
+# ==================== COMPANIES ENDPOINT ====================
+
+@app.route("/api/companies")
+def get_companies():
+    """Return companies data from companies.json"""
+    data = load_companies_data()
+    if not data:
+        return jsonify({"status": "Error", "message": "No companies data available"}), 500
+    return jsonify({"status": "OK", "data": data}), 200
+
+
 # ==================== TICK DATA ENDPOINTS ====================
 
 @app.route("/api/ticks/info")
@@ -478,6 +569,10 @@ def handle_disconnect():
     if client_id in broadcast_threads:
         broadcast_threads[client_id].stop()
         del broadcast_threads[client_id]
+    
+    if client_id in market_broadcast_threads:
+        market_broadcast_threads[client_id].stop()
+        del market_broadcast_threads[client_id]
     
     connected_clients.discard(client_id)
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -530,6 +625,57 @@ def handle_stop_ticks():
         emit('tick_data', {
             'status': 'Info',
             'message': 'No active broadcast to stop'
+        })
+
+
+# ==================== MARKET DATA WEBSOCKET HANDLERS ====================
+
+@socketio.on('start_market_data')
+def handle_start_market_data():
+    """Start broadcasting market data to the client"""
+    global market_data
+    client_id = request.sid
+
+    if client_id in market_broadcast_threads:
+        market_broadcast_threads[client_id].stop()
+
+    market_data = load_market_data()
+
+    if not market_data:
+        emit('market_data', {
+            'status': 'Error',
+            'message': 'No market data available'
+        })
+        return
+
+    broadcaster = MarketDataBroadcaster(client_id)
+    market_broadcast_threads[client_id] = broadcaster
+    broadcaster.start()
+
+    emit('market_data', {
+        'status': 'STARTED',
+        'message': 'Market data broadcasting started',
+        'total_sequences': len(market_data)
+    })
+
+
+@socketio.on('stop_market_data')
+def handle_stop_market_data():
+    """Stop broadcasting market data to the client"""
+    client_id = request.sid
+
+    if client_id in market_broadcast_threads:
+        market_broadcast_threads[client_id].stop()
+        del market_broadcast_threads[client_id]
+
+        emit('market_data', {
+            'status': 'STOPPED',
+            'message': 'Market data broadcasting stopped'
+        })
+    else:
+        emit('market_data', {
+            'status': 'Info',
+            'message': 'No active market data broadcast to stop'
         })
 
 
