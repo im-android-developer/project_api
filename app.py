@@ -686,9 +686,274 @@ def record_transaction():
         return jsonify({"status": "Error", "message": "Database connection failed"}), 500
 
 
-# ==================== COMPANIES ENDPOINT ====================
+# ==================== CART & ORDERS ENDPOINTS ====================
 
-@app.route("/api/companies")
+@app.post("/api/cart")
+def add_to_cart():
+    """Add a stock item to the user's cart."""
+    data = request.get_json(silent=True) or request.form or {}
+    user_id = (data.get("user_id") or "").strip()
+    stock_name = (data.get("stock_name") or "").strip()
+    stock_price = data.get("stock_price")
+    qty = data.get("qty")
+
+    if not user_id:
+        return jsonify({"status": "Error", "message": "user_id is required"}), 400
+    if not stock_name:
+        return jsonify({"status": "Error", "message": "stock_name is required"}), 400
+    if stock_price is None or stock_price == "":
+        return jsonify({"status": "Error", "message": "stock_price is required"}), 400
+    if qty is None or qty == "":
+        return jsonify({"status": "Error", "message": "qty is required"}), 400
+
+    try:
+        stock_price = float(stock_price)
+        qty = int(qty)
+    except (ValueError, TypeError):
+        return jsonify({"status": "Error", "message": "stock_price must be a valid number and qty must be a valid integer"}), 400
+
+    if stock_price <= 0:
+        return jsonify({"status": "Error", "message": "stock_price must be greater than 0"}), 400
+    if qty <= 0:
+        return jsonify({"status": "Error", "message": "qty must be greater than 0"}), 400
+
+    total = round(stock_price * qty, 2)
+
+    try:
+        # Verify user exists
+        rows = execute_query(
+            "SELECT id FROM users WHERE id = %s",
+            (user_id,),
+            fetch=True
+        )
+        if not rows:
+            return jsonify({"status": "Error", "message": "User not found"}), 404
+
+        cart_id = execute_query(
+            "INSERT INTO cart (user_id, stock_name, stock_price, qty, total) VALUES (%s, %s, %s, %s, %s) RETURNING cart_id",
+            (user_id, stock_name, stock_price, qty, total)
+        )
+
+        return jsonify({
+            "status": "OK",
+            "message": "Item added to cart successfully",
+            "cart_id": cart_id,
+            "user_id": int(user_id),
+            "stock_name": stock_name,
+            "stock_price": stock_price,
+            "qty": qty,
+            "total": total,
+            "cart_status": "PENDING"
+        }), 201
+    except (OperationalError, DatabaseError):
+        return jsonify({"status": "Error", "message": "Database connection failed"}), 500
+
+
+@app.route("/api/cart")
+def get_cart():
+    """Fetch all cart items for a user."""
+    user_id = request.args.get("user_id", "").strip()
+
+    if not user_id:
+        return jsonify({"status": "Error", "message": "user_id is required"}), 400
+
+    try:
+        # Verify user exists
+        user_rows = execute_query(
+            "SELECT id FROM users WHERE id = %s",
+            (user_id,),
+            fetch=True
+        )
+        if not user_rows:
+            return jsonify({"status": "Error", "message": "User not found"}), 404
+
+        rows = execute_query(
+            "SELECT cart_id, user_id, stock_name, stock_price, qty, total, status, created_at FROM cart WHERE user_id = %s ORDER BY created_at DESC",
+            (user_id,),
+            fetch=True
+        )
+
+        cart_items = []
+        for row in rows:
+            cart_items.append({
+                "cart_id": row["cart_id"],
+                "user_id": row["user_id"],
+                "stock_name": row["stock_name"],
+                "stock_price": float(row["stock_price"]),
+                "qty": row["qty"],
+                "total": float(row["total"]),
+                "status": row["status"],
+                "created_at": row["created_at"].strftime('%Y-%m-%d %H:%M:%S') if row["created_at"] else None
+            })
+
+        return jsonify({
+            "status": "OK",
+            "user_id": int(user_id),
+            "total_items": len(cart_items),
+            "cart": cart_items
+        }), 200
+    except (OperationalError, DatabaseError):
+        return jsonify({"status": "Error", "message": "Database connection failed"}), 500
+
+
+@app.post("/api/orders")
+def create_order():
+    """Create an order from cart items."""
+    data = request.get_json(silent=True) or request.form or {}
+    user_id = (data.get("user_id") or "").strip()
+    cart_ids = data.get("cart_ids")
+    order_type = (data.get("type") or "").strip()
+
+    if not user_id:
+        return jsonify({"status": "Error", "message": "user_id is required"}), 400
+    if not cart_ids or not isinstance(cart_ids, list) or len(cart_ids) == 0:
+        return jsonify({"status": "Error", "message": "cart_ids is required and must be a non-empty array"}), 400
+    if order_type not in ("Buy", "Sell"):
+        return jsonify({"status": "Error", "message": "type must be 'Buy' or 'Sell'"}), 400
+
+    try:
+        cart_ids = [int(cid) for cid in cart_ids]
+    except (ValueError, TypeError):
+        return jsonify({"status": "Error", "message": "cart_ids must contain valid integer IDs"}), 400
+
+    try:
+        # Verify user exists
+        user_rows = execute_query(
+            "SELECT id FROM users WHERE id = %s",
+            (user_id,),
+            fetch=True
+        )
+        if not user_rows:
+            return jsonify({"status": "Error", "message": "User not found"}), 404
+
+        # Verify all cart items exist and belong to the user
+        placeholders = ','.join(['%s'] * len(cart_ids))
+        cart_rows = execute_query(
+            f"SELECT cart_id FROM cart WHERE cart_id IN ({placeholders}) AND user_id = %s",
+            (*cart_ids, user_id),
+            fetch=True
+        )
+        found_ids = {row["cart_id"] for row in cart_rows}
+        missing_ids = [cid for cid in cart_ids if cid not in found_ids]
+        if missing_ids:
+            return jsonify({"status": "Error", "message": f"Cart items not found or do not belong to user: {missing_ids}"}), 404
+
+        # Update cart items status to CONFIRM
+        execute_query(
+            f"UPDATE cart SET status = 'CONFIRM' WHERE cart_id IN ({placeholders}) AND user_id = %s",
+            (*cart_ids, user_id)
+        )
+
+        # Create order
+        order_id = execute_query(
+            "INSERT INTO orders (user_id, cart_ids, type) VALUES (%s, %s, %s) RETURNING order_id",
+            (user_id, cart_ids, order_type)
+        )
+
+        return jsonify({
+            "status": "OK",
+            "message": "Order created successfully",
+            "order_id": order_id,
+            "user_id": int(user_id),
+            "cart_ids": cart_ids,
+            "type": order_type,
+            "order_available": 1
+        }), 201
+    except (OperationalError, DatabaseError):
+        return jsonify({"status": "Error", "message": "Database connection failed"}), 500
+
+
+@app.route("/api/orders/available")
+def get_available_orders():
+    """Fetch currently available orders for a user."""
+    user_id = request.args.get("user_id", "").strip()
+
+    if not user_id:
+        return jsonify({"status": "Error", "message": "user_id is required"}), 400
+
+    try:
+        # Verify user exists
+        user_rows = execute_query(
+            "SELECT id FROM users WHERE id = %s",
+            (user_id,),
+            fetch=True
+        )
+        if not user_rows:
+            return jsonify({"status": "Error", "message": "User not found"}), 404
+
+        rows = execute_query(
+            "SELECT order_id, user_id, cart_ids, date_of_transaction, type, order_available FROM orders WHERE user_id = %s AND order_available = 1 ORDER BY date_of_transaction DESC",
+            (user_id,),
+            fetch=True
+        )
+
+        orders = []
+        for row in rows:
+            orders.append({
+                "order_id": row["order_id"],
+                "user_id": row["user_id"],
+                "cart_ids": row["cart_ids"],
+                "date_of_transaction": row["date_of_transaction"].strftime('%Y-%m-%d %H:%M:%S') if row["date_of_transaction"] else None,
+                "type": row["type"],
+                "order_available": row["order_available"]
+            })
+
+        return jsonify({
+            "status": "OK",
+            "user_id": int(user_id),
+            "total_orders": len(orders),
+            "orders": orders
+        }), 200
+    except (OperationalError, DatabaseError):
+        return jsonify({"status": "Error", "message": "Database connection failed"}), 500
+
+
+@app.route("/api/orders/all")
+def get_all_orders():
+    """Fetch all orders (available and unavailable) for a user."""
+    user_id = request.args.get("user_id", "").strip()
+
+    if not user_id:
+        return jsonify({"status": "Error", "message": "user_id is required"}), 400
+
+    try:
+        # Verify user exists
+        user_rows = execute_query(
+            "SELECT id FROM users WHERE id = %s",
+            (user_id,),
+            fetch=True
+        )
+        if not user_rows:
+            return jsonify({"status": "Error", "message": "User not found"}), 404
+
+        rows = execute_query(
+            "SELECT order_id, user_id, cart_ids, date_of_transaction, type, order_available FROM orders WHERE user_id = %s ORDER BY date_of_transaction DESC",
+            (user_id,),
+            fetch=True
+        )
+
+        orders = []
+        for row in rows:
+            orders.append({
+                "order_id": row["order_id"],
+                "user_id": row["user_id"],
+                "cart_ids": row["cart_ids"],
+                "date_of_transaction": row["date_of_transaction"].strftime('%Y-%m-%d %H:%M:%S') if row["date_of_transaction"] else None,
+                "type": row["type"],
+                "order_available": row["order_available"]
+            })
+
+        return jsonify({
+            "status": "OK",
+            "user_id": int(user_id),
+            "total_orders": len(orders),
+            "orders": orders
+        }), 200
+    except (OperationalError, DatabaseError):
+        return jsonify({"status": "Error", "message": "Database connection failed"}), 500
+
+
+# ==================== COMPANIES ENDPOINT ====================
 def get_companies():
     """Return companies data from companies.json"""
     data = load_companies_data()

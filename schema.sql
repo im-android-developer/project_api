@@ -74,3 +74,23 @@ CREATE TABLE IF NOT EXISTS transactions (
     transaction_date    TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
     status              VARCHAR(10)     DEFAULT 'Pending' CHECK (status IN ('Successful', 'Pending', 'Failed'))
 );
+
+CREATE TABLE IF NOT EXISTS cart (
+    cart_id             BIGSERIAL PRIMARY KEY,
+    user_id             BIGINT          NOT NULL REFERENCES users(id),
+    stock_name          VARCHAR(100)    NOT NULL,
+    stock_price         DECIMAL(12, 2)  NOT NULL,
+    qty                 INT             NOT NULL,
+    total               DECIMAL(12, 2)  NOT NULL,
+    status              VARCHAR(10)     DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'CONFIRM')),
+    created_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+    order_id            BIGSERIAL PRIMARY KEY,
+    user_id             BIGINT          NOT NULL REFERENCES users(id),
+    cart_ids            BIGINT[]        NOT NULL,
+    date_of_transaction TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    type                VARCHAR(4)      NOT NULL CHECK (type IN ('Buy', 'Sell')),
+    order_available     SMALLINT        DEFAULT 1 CHECK (order_available IN (0, 1))
+);

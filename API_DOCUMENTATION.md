@@ -485,7 +485,272 @@ curl -X POST https://system-project-api.onrender.com/api/transactions \
 
 ---
 
-### 13. Ticks Info
+### 13. Add to Cart
+
+**POST** `/api/cart`
+
+Add a stock item to the user's cart.
+
+**Request Body** (`application/json` or `form-data`)
+
+| Field         | Type   | Required | Description                     |
+|---------------|--------|----------|---------------------------------|
+| `user_id`     | string | ✅       | The user's ID                   |
+| `stock_name`  | string | ✅       | Name of the stock               |
+| `stock_price` | number | ✅       | Price per unit (must be > 0)    |
+| `qty`         | number | ✅       | Quantity to buy (must be > 0)   |
+
+> **Note:** `total` is auto-calculated as `stock_price × qty`. Cart items are created with status `PENDING`.
+
+**Responses**
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| 201 | `{"status": "OK", "message": "Item added to cart successfully", ...}` | Item added |
+| 400 | `{"status": "Error", "message": "user_id is required"}` | Missing user_id |
+| 400 | `{"status": "Error", "message": "stock_name is required"}` | Missing stock_name |
+| 400 | `{"status": "Error", "message": "stock_price is required"}` | Missing stock_price |
+| 400 | `{"status": "Error", "message": "qty is required"}` | Missing qty |
+| 400 | `{"status": "Error", "message": "stock_price must be greater than 0"}` | Invalid price |
+| 400 | `{"status": "Error", "message": "qty must be greater than 0"}` | Invalid qty |
+| 404 | `{"status": "Error", "message": "User not found"}` | No user with this ID |
+| 500 | `{"status": "Error", "message": "Database connection failed"}` | Database error |
+
+**Example Request**
+```bash
+curl -X POST https://system-project-api.onrender.com/api/cart \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "1", "stock_name": "RELIANCE", "stock_price": 2450.50, "qty": 5}'
+```
+
+**Success Response**
+```json
+{
+  "status": "OK",
+  "message": "Item added to cart successfully",
+  "cart_id": 1,
+  "user_id": 1,
+  "stock_name": "RELIANCE",
+  "stock_price": 2450.50,
+  "qty": 5,
+  "total": 12252.50,
+  "cart_status": "PENDING"
+}
+```
+
+---
+
+### 14. Get Cart Items
+
+**GET** `/api/cart`
+
+Fetch all cart items for a user.
+
+**Query Parameters**
+
+| Parameter | Type   | Required | Description        |
+|-----------|--------|----------|--------------------|
+| `user_id` | string | ✅       | The user's ID      |
+
+**Responses**
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| 200 | `{"status": "OK", "user_id": 1, "total_items": 2, "cart": [...]}` | Cart items retrieved |
+| 400 | `{"status": "Error", "message": "user_id is required"}` | Missing user_id |
+| 404 | `{"status": "Error", "message": "User not found"}` | No user with this ID |
+| 500 | `{"status": "Error", "message": "Database connection failed"}` | Database error |
+
+**Example Request**
+```bash
+curl "https://system-project-api.onrender.com/api/cart?user_id=1"
+```
+
+**Success Response**
+```json
+{
+  "status": "OK",
+  "user_id": 1,
+  "total_items": 2,
+  "cart": [
+    {
+      "cart_id": 1,
+      "user_id": 1,
+      "stock_name": "RELIANCE",
+      "stock_price": 2450.50,
+      "qty": 5,
+      "total": 12252.50,
+      "status": "PENDING",
+      "created_at": "2026-03-23 10:30:00"
+    },
+    {
+      "cart_id": 2,
+      "user_id": 1,
+      "stock_name": "TCS",
+      "stock_price": 3800.00,
+      "qty": 2,
+      "total": 7600.00,
+      "status": "CONFIRM",
+      "created_at": "2026-03-23 10:25:00"
+    }
+  ]
+}
+```
+
+---
+
+### 15. Create Order
+
+**POST** `/api/orders`
+
+Create an order from cart items. The corresponding cart items' status will be updated to `CONFIRM`.
+
+**Request Body** (`application/json` or `form-data`)
+
+| Field      | Type     | Required | Description                                  |
+|------------|----------|----------|----------------------------------------------|
+| `user_id`  | string   | ✅       | The user's ID                                |
+| `cart_ids` | array    | ✅       | Array of cart_id integers to include in order |
+| `type`     | string   | ✅       | `Buy` or `Sell`                              |
+
+**Responses**
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| 201 | `{"status": "OK", "message": "Order created successfully", ...}` | Order created |
+| 400 | `{"status": "Error", "message": "user_id is required"}` | Missing user_id |
+| 400 | `{"status": "Error", "message": "cart_ids is required and must be a non-empty array"}` | Missing/invalid cart_ids |
+| 400 | `{"status": "Error", "message": "type must be 'Buy' or 'Sell'"}` | Invalid type |
+| 400 | `{"status": "Error", "message": "cart_ids must contain valid integer IDs"}` | Non-integer IDs |
+| 404 | `{"status": "Error", "message": "User not found"}` | No user with this ID |
+| 404 | `{"status": "Error", "message": "Cart items not found or do not belong to user: [...]"}` | Invalid cart items |
+| 500 | `{"status": "Error", "message": "Database connection failed"}` | Database error |
+
+**Example Request**
+```bash
+curl -X POST https://system-project-api.onrender.com/api/orders \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "1", "cart_ids": [1, 2, 3], "type": "Buy"}'
+```
+
+**Success Response**
+```json
+{
+  "status": "OK",
+  "message": "Order created successfully",
+  "order_id": 1,
+  "user_id": 1,
+  "cart_ids": [1, 2, 3],
+  "type": "Buy",
+  "order_available": 1
+}
+```
+
+---
+
+### 16. Get Available Orders
+
+**GET** `/api/orders/available`
+
+Fetch currently available orders (where `order_available = 1`) for a user.
+
+**Query Parameters**
+
+| Parameter | Type   | Required | Description        |
+|-----------|--------|----------|--------------------|
+| `user_id` | string | ✅       | The user's ID      |
+
+**Responses**
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| 200 | `{"status": "OK", "user_id": 1, "total_orders": 2, "orders": [...]}` | Available orders retrieved |
+| 400 | `{"status": "Error", "message": "user_id is required"}` | Missing user_id |
+| 404 | `{"status": "Error", "message": "User not found"}` | No user with this ID |
+| 500 | `{"status": "Error", "message": "Database connection failed"}` | Database error |
+
+**Example Request**
+```bash
+curl "https://system-project-api.onrender.com/api/orders/available?user_id=1"
+```
+
+**Success Response**
+```json
+{
+  "status": "OK",
+  "user_id": 1,
+  "total_orders": 2,
+  "orders": [
+    {
+      "order_id": 1,
+      "user_id": 1,
+      "cart_ids": [1, 2, 3],
+      "date_of_transaction": "2026-03-23 10:35:00",
+      "type": "Buy",
+      "order_available": 1
+    }
+  ]
+}
+```
+
+---
+
+### 17. Get All Orders
+
+**GET** `/api/orders/all`
+
+Fetch all orders (both available and unavailable) for a particular user.
+
+**Query Parameters**
+
+| Parameter | Type   | Required | Description        |
+|-----------|--------|----------|--------------------|
+| `user_id` | string | ✅       | The user's ID      |
+
+**Responses**
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| 200 | `{"status": "OK", "user_id": 1, "total_orders": 3, "orders": [...]}` | All orders retrieved |
+| 400 | `{"status": "Error", "message": "user_id is required"}` | Missing user_id |
+| 404 | `{"status": "Error", "message": "User not found"}` | No user with this ID |
+| 500 | `{"status": "Error", "message": "Database connection failed"}` | Database error |
+
+**Example Request**
+```bash
+curl "https://system-project-api.onrender.com/api/orders/all?user_id=1"
+```
+
+**Success Response**
+```json
+{
+  "status": "OK",
+  "user_id": 1,
+  "total_orders": 3,
+  "orders": [
+    {
+      "order_id": 2,
+      "user_id": 1,
+      "cart_ids": [4, 5],
+      "date_of_transaction": "2026-03-23 11:00:00",
+      "type": "Sell",
+      "order_available": 0
+    },
+    {
+      "order_id": 1,
+      "user_id": 1,
+      "cart_ids": [1, 2, 3],
+      "date_of_transaction": "2026-03-23 10:35:00",
+      "type": "Buy",
+      "order_available": 1
+    }
+  ]
+}
+```
+
+---
+
+### 18. Ticks Info
 
 **GET** `/api/ticks/info`
 
