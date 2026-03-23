@@ -1,7 +1,7 @@
 -- PostgreSQL schema for StockMarketDB
 -- Run against your Render PostgreSQL database
 
-CREATE TABLE IF NOT EXISTS userbase (
+CREATE TABLE IF NOT EXISTS users (
 
     -- 1. Primary Identification
     id                  BIGSERIAL PRIMARY KEY,
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS userbase (
 
 CREATE TABLE IF NOT EXISTS transactions (
     tr_id               BIGSERIAL PRIMARY KEY,
-    user_id             BIGINT          NOT NULL REFERENCES userbase(id),
+    user_id             BIGINT          NOT NULL REFERENCES users(id),
     amount              DECIMAL(12, 2)  NOT NULL,
     transaction_type    VARCHAR(10)     NOT NULL CHECK (transaction_type IN ('credit', 'debit')),
     transaction_date    TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
