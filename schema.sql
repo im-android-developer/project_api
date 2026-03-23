@@ -65,3 +65,12 @@ CREATE TABLE IF NOT EXISTS userbase (
     created_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS transactions (
+    tr_id               BIGSERIAL PRIMARY KEY,
+    user_id             BIGINT          NOT NULL REFERENCES userbase(id),
+    amount              DECIMAL(12, 2)  NOT NULL,
+    transaction_type    VARCHAR(10)     NOT NULL CHECK (transaction_type IN ('credit', 'debit')),
+    transaction_date    TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    status              VARCHAR(10)     DEFAULT 'Pending' CHECK (status IN ('Successful', 'Pending', 'Failed'))
+);

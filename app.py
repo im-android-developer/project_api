@@ -519,6 +519,173 @@ def reset_password():
         return jsonify({"status": "Error", "message": "Database connection failed"}), 500
 
 
+# ==================== KYC & WALLET ENDPOINTS ====================
+
+@app.route("/api/kyc-status")
+def kyc_status():
+    """Check KYC status of a user."""
+    user_id = request.args.get("user_id", "").strip()
+
+    if not user_id:
+        return jsonify({"status": "Error", "message": "user_id is required"}), 400
+
+    try:
+        rows = execute_query(
+            "SELECT id, kyc_status FROM users WHERE id = %s",
+            (user_id,),
+            fetch=True
+        )
+        if not rows:
+            return jsonify({"status": "Error", "message": "User not found"}), 404
+
+        return jsonify({
+            "status": "OK",
+            "user_id": rows[0]["id"],
+            "kyc_status": rows[0]["kyc_status"]
+        }), 200
+    except (OperationalError, DatabaseError):
+        return jsonify({"status": "Error", "message": "Database connection failed"}), 500
+
+
+@app.route("/api/wallet-balance")
+def wallet_balance():
+    """Fetch wallet balance of a user."""
+    user_id = request.args.get("user_id", "").strip()
+
+    if not user_id:
+        return jsonify({"status": "Error", "message": "user_id is required"}), 400
+
+    try:
+        rows = execute_query(
+            "SELECT id, wallet_balance FROM users WHERE id = %s",
+            (user_id,),
+            fetch=True
+        )
+        if not rows:
+            return jsonify({"status": "Error", "message": "User not found"}), 404
+
+        return jsonify({
+            "status": "OK",
+            "user_id": rows[0]["id"],
+            "wallet_balance": float(rows[0]["wallet_balance"])
+        }), 200
+    except (OperationalError, DatabaseError):
+        return jsonify({"status": "Error", "message": "Database connection failed"}), 500
+
+
+@app.post("/api/wallet-update")
+def wallet_update():
+    """Update wallet balance when user adds or withdraws amount."""
+    data = request.get_json(silent=True) or request.form or {}
+    user_id = (data.get("user_id") or "").strip()
+    amount = data.get("amount")
+    transaction_type = (data.get("transaction_type") or "").strip().lower()
+
+    if not user_id:
+        return jsonify({"status": "Error", "message": "user_id is required"}), 400
+    if amount is None or amount == "":
+        return jsonify({"status": "Error", "message": "amount is required"}), 400
+    if transaction_type not in ("credit", "debit"):
+        return jsonify({"status": "Error", "message": "transaction_type must be 'credit' or 'debit'"}), 400
+
+    try:
+        amount = float(amount)
+    except (ValueError, TypeError):
+        return jsonify({"status": "Error", "message": "amount must be a valid number"}), 400
+
+    if amount <= 0:
+        return jsonify({"status": "Error", "message": "amount must be greater than 0"}), 400
+
+    try:
+        rows = execute_query(
+            "SELECT id, wallet_balance FROM users WHERE id = %s",
+            (user_id,),
+            fetch=True
+        )
+        if not rows:
+            return jsonify({"status": "Error", "message": "User not found"}), 404
+
+        current_balance = float(rows[0]["wallet_balance"])
+
+        if transaction_type == "debit" and amount > current_balance:
+            return jsonify({"status": "Error", "message": "Insufficient wallet balance"}), 400
+
+        if transaction_type == "credit":
+            new_balance = current_balance + amount
+        else:
+            new_balance = current_balance - amount
+
+        execute_query(
+            "UPDATE users SET wallet_balance = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+            (new_balance, user_id)
+        )
+
+        return jsonify({
+            "status": "OK",
+            "message": f"Wallet {'credited' if transaction_type == 'credit' else 'debited'} successfully",
+            "previous_balance": current_balance,
+            "amount": amount,
+            "transaction_type": transaction_type,
+            "new_balance": new_balance
+        }), 200
+    except (OperationalError, DatabaseError):
+        return jsonify({"status": "Error", "message": "Database connection failed"}), 500
+
+
+@app.post("/api/transactions")
+def record_transaction():
+    """Record a user transaction."""
+    data = request.get_json(silent=True) or request.form or {}
+    user_id = (data.get("user_id") or "").strip()
+    amount = data.get("amount")
+    transaction_type = (data.get("transaction_type") or "").strip().lower()
+    status = (data.get("status") or "").strip()
+
+    if not user_id:
+        return jsonify({"status": "Error", "message": "user_id is required"}), 400
+    if amount is None or amount == "":
+        return jsonify({"status": "Error", "message": "amount is required"}), 400
+    if transaction_type not in ("credit", "debit"):
+        return jsonify({"status": "Error", "message": "transaction_type must be 'credit' or 'debit'"}), 400
+    if status not in ("Successful", "Pending", "Failed"):
+        return jsonify({"status": "Error", "message": "status must be 'Successful', 'Pending', or 'Failed'"}), 400
+
+    try:
+        amount = float(amount)
+    except (ValueError, TypeError):
+        return jsonify({"status": "Error", "message": "amount must be a valid number"}), 400
+
+    if amount <= 0:
+        return jsonify({"status": "Error", "message": "amount must be greater than 0"}), 400
+
+    try:
+        # Verify user exists
+        rows = execute_query(
+            "SELECT id FROM users WHERE id = %s",
+            (user_id,),
+            fetch=True
+        )
+        if not rows:
+            return jsonify({"status": "Error", "message": "User not found"}), 404
+
+        tr_id = execute_query(
+            "INSERT INTO transactions (user_id, amount, transaction_type, status) VALUES (%s, %s, %s, %s) RETURNING tr_id",
+            (user_id, amount, transaction_type, status)
+        )
+
+        return jsonify({
+            "status": "OK",
+            "message": "Transaction recorded successfully",
+            "tr_id": tr_id,
+            "user_id": int(user_id),
+            "amount": amount,
+            "transaction_type": transaction_type,
+            "transaction_status": status
+        }), 201
+    except (OperationalError, DatabaseError):
+        return jsonify({"status": "Error", "message": "Database connection failed"}), 500
+
+
 # ==================== COMPANIES ENDPOINT ====================
 
 @app.route("/api/companies")

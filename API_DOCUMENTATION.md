@@ -302,7 +302,190 @@ curl -X POST https://system-project-api.onrender.com/api/resetpassword \
 
 ---
 
-### 9. Ticks Info
+### 9. KYC Status
+
+**GET** `/api/kyc-status`
+
+Check the KYC verification status of a user (pending, verified, or rejected).
+
+**Query Parameters**
+
+| Parameter | Type   | Required | Description        |
+|-----------|--------|----------|--------------------|
+| `user_id` | string | ✅       | The user's ID      |
+
+**Responses**
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| 200 | `{"status": "OK", "user_id": 1, "kyc_status": "pending"}` | KYC status retrieved |
+| 400 | `{"status": "Error", "message": "user_id is required"}` | Missing user_id |
+| 404 | `{"status": "Error", "message": "User not found"}` | No user with this ID |
+| 500 | `{"status": "Error", "message": "Database connection failed"}` | Database error |
+
+**Example Request**
+```bash
+curl "https://system-project-api.onrender.com/api/kyc-status?user_id=1"
+```
+
+**Success Response**
+```json
+{
+  "status": "OK",
+  "user_id": 1,
+  "kyc_status": "pending"
+}
+```
+
+> **Note:** Possible `kyc_status` values: `pending`, `verified`, `rejected`.
+
+---
+
+### 10. Wallet Balance
+
+**GET** `/api/wallet-balance`
+
+Fetch the current wallet balance of a user.
+
+**Query Parameters**
+
+| Parameter | Type   | Required | Description        |
+|-----------|--------|----------|--------------------|
+| `user_id` | string | ✅       | The user's ID      |
+
+**Responses**
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| 200 | `{"status": "OK", "user_id": 1, "wallet_balance": 5000.00}` | Balance retrieved |
+| 400 | `{"status": "Error", "message": "user_id is required"}` | Missing user_id |
+| 404 | `{"status": "Error", "message": "User not found"}` | No user with this ID |
+| 500 | `{"status": "Error", "message": "Database connection failed"}` | Database error |
+
+**Example Request**
+```bash
+curl "https://system-project-api.onrender.com/api/wallet-balance?user_id=1"
+```
+
+**Success Response**
+```json
+{
+  "status": "OK",
+  "user_id": 1,
+  "wallet_balance": 5000.00
+}
+```
+
+---
+
+### 11. Update Wallet Balance
+
+**POST** `/api/wallet-update`
+
+Add or withdraw amount from a user's wallet.
+
+**Request Body** (`application/json` or `form-data`)
+
+| Field              | Type   | Required | Description                              |
+|--------------------|--------|----------|------------------------------------------|
+| `user_id`          | string | ✅       | The user's ID                            |
+| `amount`           | number | ✅       | Amount to add or withdraw (must be > 0)  |
+| `transaction_type` | string | ✅       | `credit` (add) or `debit` (withdraw)     |
+
+**Responses**
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| 200 | `{"status": "OK", "message": "Wallet credited successfully", ...}` | Wallet updated |
+| 400 | `{"status": "Error", "message": "user_id is required"}` | Missing user_id |
+| 400 | `{"status": "Error", "message": "amount is required"}` | Missing amount |
+| 400 | `{"status": "Error", "message": "transaction_type must be 'credit' or 'debit'"}` | Invalid type |
+| 400 | `{"status": "Error", "message": "amount must be a valid number"}` | Non-numeric amount |
+| 400 | `{"status": "Error", "message": "amount must be greater than 0"}` | Zero or negative amount |
+| 400 | `{"status": "Error", "message": "Insufficient wallet balance"}` | Debit exceeds balance |
+| 404 | `{"status": "Error", "message": "User not found"}` | No user with this ID |
+| 500 | `{"status": "Error", "message": "Database connection failed"}` | Database error |
+
+**Example Request (Credit)**
+```bash
+curl -X POST https://system-project-api.onrender.com/api/wallet-update \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "1", "amount": 5000, "transaction_type": "credit"}'
+```
+
+**Example Request (Debit)**
+```bash
+curl -X POST https://system-project-api.onrender.com/api/wallet-update \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "1", "amount": 2000, "transaction_type": "debit"}'
+```
+
+**Success Response**
+```json
+{
+  "status": "OK",
+  "message": "Wallet credited successfully",
+  "previous_balance": 5000.00,
+  "amount": 2000.00,
+  "transaction_type": "credit",
+  "new_balance": 7000.00
+}
+```
+
+---
+
+### 12. Record Transaction
+
+**POST** `/api/transactions`
+
+Record a user's transaction in the transactions table.
+
+**Request Body** (`application/json` or `form-data`)
+
+| Field              | Type   | Required | Description                                        |
+|--------------------|--------|----------|----------------------------------------------------|
+| `user_id`          | string | ✅       | The user's ID                                      |
+| `amount`           | number | ✅       | Transaction amount (must be > 0)                   |
+| `transaction_type` | string | ✅       | `credit` or `debit`                                |
+| `status`           | string | ✅       | `Successful`, `Pending`, or `Failed`               |
+
+**Responses**
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| 201 | `{"status": "OK", "message": "Transaction recorded successfully", ...}` | Transaction created |
+| 400 | `{"status": "Error", "message": "user_id is required"}` | Missing user_id |
+| 400 | `{"status": "Error", "message": "amount is required"}` | Missing amount |
+| 400 | `{"status": "Error", "message": "transaction_type must be 'credit' or 'debit'"}` | Invalid type |
+| 400 | `{"status": "Error", "message": "status must be 'Successful', 'Pending', or 'Failed'"}` | Invalid status |
+| 400 | `{"status": "Error", "message": "amount must be a valid number"}` | Non-numeric amount |
+| 400 | `{"status": "Error", "message": "amount must be greater than 0"}` | Zero or negative amount |
+| 404 | `{"status": "Error", "message": "User not found"}` | No user with this ID |
+| 500 | `{"status": "Error", "message": "Database connection failed"}` | Database error |
+
+**Example Request**
+```bash
+curl -X POST https://system-project-api.onrender.com/api/transactions \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "1", "amount": 5000, "transaction_type": "credit", "status": "Successful"}'
+```
+
+**Success Response**
+```json
+{
+  "status": "OK",
+  "message": "Transaction recorded successfully",
+  "tr_id": 1,
+  "user_id": 1,
+  "amount": 5000.00,
+  "transaction_type": "credit",
+  "transaction_status": "Successful"
+}
+```
+
+---
+
+### 13. Ticks Info
 
 **GET** `/api/ticks/info`
 
